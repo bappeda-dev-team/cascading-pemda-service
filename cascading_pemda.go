@@ -27,7 +27,7 @@ type PohonKinerjaPemda struct {
 	Childs            []PohonKinerjaPemda `json:"childs,omitempty"`
 	RencanaKinerjas   []RencanaKinerjaAsn `json:"rencana_kinerjas,omitempty"`
 
-	Status    string `json:"-"`
+	Status string `json:"-"`
 }
 
 type Urusan struct {
@@ -56,12 +56,13 @@ type Subkegiatan struct {
 }
 
 type RencanaKinerjaAsn struct {
-	IdRekin          string      `json:"id_rekin"`
-	RencanaKinerja   string      `json:"rencana_kinerja"`
-	NamaPelaksana    string      `json:"nama_pelaksana"`
-	NIPPelaksana     string      `json:"nip_pelaksana"`
-	SubkegiatanRekin Subkegiatan `json:"subkegiatan_rekin"`
-	Pagu             Pagu        `json:"pagu"`
+	IdRekin         string `json:"id_rekin"`
+	RencanaKinerja  string `json:"rencana_kinerja"`
+	NamaPelaksana   string `json:"nama_pelaksana"`
+	NIPPelaksana    string `json:"nip_pelaksana"`
+	KodeSubkegiatan string `json:"kode_subkegiatan"`
+	NamaSubkegiatan string `json:"nama_subkegiatan"`
+	Pagu            Pagu   `json:"pagu"`
 }
 
 type IndikatorPohon struct {

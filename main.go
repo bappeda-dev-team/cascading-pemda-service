@@ -60,6 +60,87 @@ func initDB() {
 	log.Printf("Idle Connections: %d", db.Stats().Idle)
 }
 
+func getUrusan(kodeBidangUrusan string) (Urusan, error) {
+	var kodeUrusan = kodeBidangUrusan[:1]
+	rows, err := db.Query(`SELECT kode_urusan, nama_urusan FROM tb_urusan WHERE kode_urusan = ?`, kodeUrusan)
+	if err != nil {
+		return Urusan{}, fmt.Errorf("query error: %w", err)
+	}
+	defer rows.Close()
+
+	var urs Urusan
+	for rows.Next() {
+		if err := rows.Scan(&urs.KodeUrusan, &urs.NamaUrusan); err != nil {
+			if err == sql.ErrNoRows {
+				return Urusan{}, fmt.Errorf("program tidak ditemukan untuk kode urusan %s", kodeUrusan)
+			}
+			return Urusan{}, fmt.Errorf("query error: %w", err)
+		}
+	}
+	return urs, nil
+}
+
+func getBidangUrusan(kodeProgram string) (BidangUrusan, error) {
+	var kodeBidangUrusan = kodeProgram[:4]
+	rows, err := db.Query(`SELECT kode_bidang_urusan, nama_bidang_urusan FROM tb_bidang_urusan WHERE kode_bidang_urusan = ?`, kodeBidangUrusan)
+	if err != nil {
+		return BidangUrusan{}, fmt.Errorf("query error: %w", err)
+	}
+	defer rows.Close()
+
+	var bidUr BidangUrusan
+	for rows.Next() {
+		if err := rows.Scan(&bidUr.KodeBidangUrusan, &bidUr.NamaBidangUrusan); err != nil {
+			if err == sql.ErrNoRows {
+				return BidangUrusan{}, fmt.Errorf("program tidak ditemukan untuk kode bidang urusan %s", kodeBidangUrusan)
+			}
+			return BidangUrusan{}, fmt.Errorf("query error: %w", err)
+		}
+	}
+	return bidUr, nil
+}
+
+func getProgramFromKegiatan(kodeKegiatan string) (Program, error) {
+	var kodeProgram = kodeKegiatan[:7]
+	rows, err := db.Query(`SELECT kode_program, nama_program FROM tb_master_program WHERE kode_program = ?`, kodeProgram)
+	if err != nil {
+		return Program{}, fmt.Errorf("query error: %w", err)
+	}
+	defer rows.Close()
+
+	var prog Program
+	for rows.Next() {
+		if err := rows.Scan(&prog.KodeProgram, &prog.NamaProgram); err != nil {
+			if err == sql.ErrNoRows {
+				return Program{}, fmt.Errorf("program tidak ditemukan untuk kode program %s", kodeProgram)
+			}
+			return Program{}, fmt.Errorf("query error: %w", err)
+		}
+	}
+	return prog, nil
+}
+
+func getKegiatanFromSubkegiatan(kodeSubkegiatan string) (Kegiatan, error) {
+	var kodeKegiatan = kodeSubkegiatan[:12] // substring kode subkegiatan
+	rows, err := db.Query(`SELECT kode_kegiatan, nama_kegiatan FROM tb_master_kegiatan WHERE kode_kegiatan = ?`, kodeKegiatan)
+	if err != nil {
+		return Kegiatan{}, fmt.Errorf("query error: %w", err)
+	}
+	defer rows.Close()
+
+	var keg Kegiatan
+	for rows.Next() {
+		if err := rows.Scan(&keg.KodeKegiatan, &keg.NamaKegiatan); err != nil {
+			if err == sql.ErrNoRows {
+				return Kegiatan{}, fmt.Errorf("kegiatan tidak ditemukan untuk kode_subkegiatan: %s", kodeSubkegiatan)
+			}
+			return Kegiatan{}, fmt.Errorf("query error: %w", err)
+		}
+	}
+
+	return keg, nil
+}
+
 func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 	query := `
 		SELECT rekin.id,
@@ -106,10 +187,10 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 
 		// Handle NULL dengan NullString/NullInt64
 		if kodeSub.Valid {
-			rekin.SubkegiatanRekin.KodeSubkegiatan = kodeSub.String
+			rekin.KodeSubkegiatan = kodeSub.String
 		}
 		if namaSub.Valid {
-			rekin.SubkegiatanRekin.NamaSubkegiatan = namaSub.String
+			rekin.NamaSubkegiatan = namaSub.String
 		}
 		if pagu.Valid {
 			rekin.Pagu = Pagu(pagu.Int64)
@@ -223,6 +304,16 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 				return nil, 0, fmt.Errorf("findPokinById(%d): %w", pt.IdPohon, err)
 			}
 			pt.RencanaKinerjas = sourcePokin.RencanaKinerjas
+
+			var kegiatans []Kegiatan
+			for _, rekin := range pt.RencanaKinerjas {
+				kegiatanPokin, err := getKegiatanFromSubkegiatan(rekin.KodeSubkegiatan)
+				if err != nil {
+					return nil, 0, fmt.Errorf("Kegiatan tidak ditemukan")
+				}
+				kegiatans = append(kegiatans, kegiatanPokin)
+			}
+			pt.KegiatanPokin = kegiatans
 		}
 
 		// rekursif ambil anaknya
@@ -231,6 +322,45 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 			return nil, 0, err
 		}
 		pt.Childs = childTematiks
+
+		if pt.JenisPohon == "Tactical Pemda" && pt.Status == "disetujui" {
+			var programs []Program
+			for _, child := range pt.Childs {
+				var kegiatans = child.KegiatanPokin
+				for _, kegiatan := range kegiatans {
+					programPokin, err := getProgramFromKegiatan(kegiatan.KodeKegiatan)
+					if err != nil {
+						return nil, 0, fmt.Errorf("Program tidak ditemukan")
+					}
+					programs = append(programs, programPokin)
+				}
+			}
+			pt.ProgramPokin = programs
+		}
+
+		if pt.JenisPohon == "Strategic Pemda" && pt.Status == "disetujui" {
+			var bidangUrusans []BidangUrusan
+			for _, child := range pt.Childs {
+				var programs = child.ProgramPokin
+				for _, program := range programs {
+					bidangUrusanPokin, err := getBidangUrusan(program.KodeProgram)
+					if err != nil {
+						return nil, 0, fmt.Errorf("Bidang Urusan tidak ditermukan")
+					}
+					bidangUrusans = append(bidangUrusans, bidangUrusanPokin)
+				}
+			}
+			pt.BidangUrusanPokin = bidangUrusans
+		}
+
+		if pt.JenisPohon == "Sub Tematik" {
+			var bidangUrusans []BidangUrusan
+			for _, child := range pt.Childs {
+				bidangUrusanPokin := child.BidangUrusanPokin
+				bidangUrusans = append(bidangUrusans, bidangUrusanPokin...)
+			}
+			pt.BidangUrusanPokin = bidangUrusans
+		}
 
 		// hitung pagu node ini sendiri
 		var nodePagu Pagu = 0
@@ -307,6 +437,22 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 
 		pt.Childs = childs
 		pt.Pagu = totalPagu
+
+		// get urusan for tematik
+		var urusans []Urusan
+		for _, child := range pt.Childs {
+			var bidangUrusans = child.BidangUrusanPokin
+			for _, bidangUrusan := range bidangUrusans {
+				urusanPokin, err := getUrusan(bidangUrusan.KodeBidangUrusan)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				urusans = append(urusans, urusanPokin)
+			}
+		}
+		pt.UrusanPokin = urusans
+		// end get urusans
 
 		list = append(list, pt)
 	}
