@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -259,10 +260,23 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// parameter for tematik
+	tematikIdStr := r.URL.Query().Get("tematikId")
+	if tematikIdStr == "" {
+		http.Error(w, "params tematikId is required, misal: ?tematikId=123", http.StatusBadRequest)
+		return
+	}
+
+	tematikId, err := strconv.Atoi(tematikIdStr)
+	if err != nil {
+		http.Error(w, "invalid tematikId", http.StatusBadRequest)
+		return
+	}
+
 	// query pohon tematik
 	rows, err := db.Query(`SELECT id, tahun, nama_pohon, kode_opd, jenis_pohon, keterangan,  status
                            FROM tb_pohon_kinerja
-                           WHERE level_pohon = 0 AND parent = 0 AND jenis_pohon = 'Tematik' AND tahun = 2025 LIMIT 1`)
+                           WHERE level_pohon = 0 AND parent = 0 AND jenis_pohon = 'Tematik' AND id = ? LIMIT 1`, tematikId)
 	if err != nil {
 		http.Error(w, "query error: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -311,6 +325,6 @@ func main() {
 
 	initDB()
 
-	http.HandleFunc("/cascading", cascadingHandler)
+	http.HandleFunc("/laporan/cascading_pemda", cascadingHandler)
 	http.ListenAndServe(":8080", nil)
 }
