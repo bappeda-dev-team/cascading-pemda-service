@@ -298,7 +298,7 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 		pt.Indikators = indCt
 
 		// operational pemda → ambil rencana kinerja langsung pakai IdPohon
-		if pt.JenisPohon == "Operational Pemda" && pt.Status == "disetujui" {
+		if pt.Status == "disetujui" {
 			sourcePokin, err := findPokinById(pt.IdPohon)
 			if err != nil {
 				return nil, 0, fmt.Errorf("findPokinById(%d): %w", pt.IdPohon, err)
