@@ -60,6 +60,31 @@ func initDB() {
 	log.Printf("Idle Connections: %d", db.Stats().Idle)
 }
 
+func getTujuanPemda(idPokin int) ([]TujuanPemda, error) {
+	rows, err := db.Query(`SELECT tuj.id, tuj.tujuan_pemda, tuj.tematik_id, tuj.periode_id, per.tahun_awal, per.tahun_akhir, per.jenis_periode
+						   FROM tb_tujuan_pemda tuj
+						   JOIN tb_periode per ON per.id = tuj.periode_id
+						   WHERE tuj.tematik_id = ?`, idPokin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tujuans []TujuanPemda
+	for rows.Next() {
+		var tuj TujuanPemda
+		if err := rows.Scan(&tuj.IdTujuanPemda, &tuj.TujuanPemda,
+			&tuj.TematikId, &tuj.PeriodeId,
+			&tuj.Periode.TahunAwal, &tuj.Periode.TahunAkhir, &tuj.Periode.JenisPeriode); err != nil {
+			return nil, err
+		}
+
+		tujuans = append(tujuans, tuj)
+	}
+
+	return tujuans, nil
+}
+
 func getTaggingPokin(idPokin int) ([]TaggingPokin, error) {
 	rows, err := db.Query(`SELECT id, id_pokin, nama_tagging, keterangan_tagging, clone_from
                            FROM tb_tagging_pokin
@@ -510,6 +535,13 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		pt.Tagging = tagList
+
+		tujuanPemdas, err := getTujuanPemda(pt.IdPohon)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pt.TujuanPemda = tujuanPemdas
 
 		list = append(list, pt)
 	}

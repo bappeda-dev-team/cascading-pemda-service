@@ -20,17 +20,18 @@ type PohonKinerjaPemda struct {
 	LevelPohon        int                 `json:"level_pohon"`
 	JenisPohon        JenisPohon          `json:"jenis_pohon"`
 	Keterangan        Keterangan          `json:"keterangan"`
+	TujuanPemda       []TujuanPemda       `json:"tujuan_pemda,omitempty"`
 	UrusanPokin       []Urusan            `json:"urusan_pokin,omitempty"`
 	BidangUrusanPokin []BidangUrusan      `json:"bidang_urusan_pokin,omitempty"`
 	ProgramPokin      []Program           `json:"program_pokin,omitempty"`
 	KegiatanPokin     []Kegiatan          `json:"kegiatan_pokin,omitempty"`
 	Pagu              Pagu                `json:"pagu"`
-	Indikators        []IndikatorPohon    `json:"indikator,omitempty"`
-	Childs            []PohonKinerjaPemda `json:"childs,omitempty"`
-	RencanaKinerjas   []RencanaKinerjaAsn `json:"pelaksana,omitempty"`
 	Tagging           []TaggingPokin      `json:"tagging"`
+	RencanaKinerjas   []RencanaKinerjaAsn `json:"pelaksana,omitempty"`
 
-	Status string `json:"-"`
+	Indikators []IndikatorPohon    `json:"indikator,omitempty"`
+	Childs     []PohonKinerjaPemda `json:"childs,omitempty"`
+	Status     string              `json:"-"`
 }
 
 type Urusan struct {
@@ -89,4 +90,18 @@ type TaggingPokin struct {
 	NamaTagging       string `json:"nama_tagging"`
 	KeteranganTagging string `json:"keterangan_tagging"`
 	CloneFrom         int    `json:"clone_from"`
+}
+
+type TujuanPemda struct {
+	IdTujuanPemda int           `json:"id_tujuan_pemda"`
+	TujuanPemda   string        `json:"tujuan_pemda"`
+	TematikId     int           `json:"tematik_id,omitempty"`
+	PeriodeId     int           `json:"periode_id,omitempty"`
+	Periode       PeriodeTujuan `json:"periode"`
+}
+
+type PeriodeTujuan struct {
+	TahunAwal    string `json:"tahun_awal"`
+	TahunAkhir   string `json:"tahun_akhir"`
+	JenisPeriode string `json:"jenis_periode"`
 }
