@@ -60,6 +60,29 @@ func initDB() {
 	log.Printf("Idle Connections: %d", db.Stats().Idle)
 }
 
+func getSasaranPemda(idPokin int) ([]SasaranPemda, error) {
+	rows, err := db.Query(`SELECT sas.id, sas.subtema_id, sas.sasaran_pemda, sas.periode_id, per.tahun_awal, per.tahun_akhir, per.jenis_periode
+                           FROM tb_sasaran_pemda sas
+						   JOIN tb_periode per ON per.id = sas.periode_id
+						   WHERE sas.subtema_id = ?`, idPokin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sasaranPemdas []SasaranPemda
+	for rows.Next() {
+		var sp SasaranPemda
+		if err := rows.Scan(&sp.IdSasaranPemda, &sp.SubtemaId, &sp.SasaranPemda,
+			&sp.PeriodeId, &sp.Periode.TahunAwal, &sp.Periode.TahunAkhir, &sp.Periode.JenisPeriode); err != nil {
+			return nil, err
+		}
+
+		sasaranPemdas = append(sasaranPemdas, sp)
+	}
+	return sasaranPemdas, nil
+}
+
 func getTujuanPemda(idPokin int) ([]TujuanPemda, error) {
 	rows, err := db.Query(`SELECT tuj.id, tuj.tujuan_pemda, tuj.tematik_id, tuj.periode_id, per.tahun_awal, per.tahun_akhir, per.jenis_periode
 						   FROM tb_tujuan_pemda tuj
@@ -424,6 +447,14 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 				bidangUrusans = append(bidangUrusans, bidangUrusanPokin...)
 			}
 			pt.BidangUrusanPokin = bidangUrusans
+		}
+
+		if pt.JenisPohon == "Sub Tematik" || pt.JenisPohon == "Sub Sub Tematik" {
+			sasaranPemdas, err := getSasaranPemda(pt.IdPohon)
+			if err != nil {
+				return nil, 0, err
+			}
+			pt.SasaranPemda = sasaranPemdas
 		}
 
 		// hitung pagu node ini sendiri

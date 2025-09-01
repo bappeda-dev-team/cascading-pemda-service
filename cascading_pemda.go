@@ -21,6 +21,7 @@ type PohonKinerjaPemda struct {
 	JenisPohon        JenisPohon          `json:"jenis_pohon"`
 	Keterangan        Keterangan          `json:"keterangan"`
 	TujuanPemda       []TujuanPemda       `json:"tujuan_pemda,omitempty"`
+	SasaranPemda      []SasaranPemda      `json:"sasaran_pemda,omitempty"`
 	UrusanPokin       []Urusan            `json:"urusan_pokin,omitempty"`
 	BidangUrusanPokin []BidangUrusan      `json:"bidang_urusan_pokin,omitempty"`
 	ProgramPokin      []Program           `json:"program_pokin,omitempty"`
@@ -104,4 +105,12 @@ type PeriodeTujuan struct {
 	TahunAwal    string `json:"tahun_awal"`
 	TahunAkhir   string `json:"tahun_akhir"`
 	JenisPeriode string `json:"jenis_periode"`
+}
+
+type SasaranPemda struct {
+	IdSasaranPemda int           `json:"id_sasaran_pemda"`
+	SubtemaId      int           `json:"subtema_id,omitempty"`
+	SasaranPemda   string        `json:"sasaran_pemda"`
+	PeriodeId      int           `json:"periode_id,omitempty"`
+	Periode        PeriodeTujuan `json:"periode"`
 }
