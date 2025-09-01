@@ -27,7 +27,8 @@ type PohonKinerjaPemda struct {
 	Pagu              Pagu                `json:"pagu"`
 	Indikators        []IndikatorPohon    `json:"indikator,omitempty"`
 	Childs            []PohonKinerjaPemda `json:"childs,omitempty"`
-	RencanaKinerjas   []RencanaKinerjaAsn `json:"rencana_kinerjas,omitempty"`
+	RencanaKinerjas   []RencanaKinerjaAsn `json:"pelaksana,omitempty"`
+	Tagging           []TaggingPokin      `json:"tagging"`
 
 	Status string `json:"-"`
 }
@@ -80,4 +81,12 @@ type TargetIndikator struct {
 	Target      string `json:"target"`
 	Satuan      string `json:"satuan"`
 	Tahun       Tahun  `json:"tahun"`
+}
+
+type TaggingPokin struct {
+	Id                int    `json:"id"`
+	IdPokin           int    `json:"id_pokin"`
+	NamaTagging       string `json:"nama_tagging"`
+	KeteranganTagging string `json:"keterangan_tagging"`
+	CloneFrom         int    `json:"clone_from"`
 }

@@ -60,6 +60,28 @@ func initDB() {
 	log.Printf("Idle Connections: %d", db.Stats().Idle)
 }
 
+func getTaggingPokin(idPokin int) ([]TaggingPokin, error) {
+	rows, err := db.Query(`SELECT id, id_pokin, nama_tagging, keterangan_tagging, clone_from
+                           FROM tb_tagging_pokin
+                           WHERE id_pokin = ?`, idPokin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []TaggingPokin
+	for rows.Next() {
+		var tag TaggingPokin
+		if err := rows.Scan(&tag.Id, &tag.IdPokin, &tag.NamaTagging, &tag.KeteranganTagging, &tag.CloneFrom); err != nil {
+			return nil, err
+		}
+
+		tags = append(tags, tag)
+	}
+
+	return tags, nil
+}
+
 func getUrusan(kodeBidangUrusan string) (Urusan, error) {
 	var kodeUrusan = kodeBidangUrusan[:1]
 	rows, err := db.Query(`SELECT kode_urusan, nama_urusan FROM tb_urusan WHERE kode_urusan = ?`, kodeUrusan)
@@ -394,6 +416,12 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 		// tambahkan ke total pagu parent
 		totalPagu += nodePagu
 
+		tagList, err := getTaggingPokin(pt.IdPohon)
+		if err != nil {
+			return nil, 0, err
+		}
+		pt.Tagging = tagList
+
 		childs = append(childs, pt)
 	}
 
@@ -475,6 +503,13 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		pt.UrusanPokin = urusans
 		// end get urusans
+
+		tagList, err := getTaggingPokin(pt.IdPohon)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pt.Tagging = tagList
 
 		list = append(list, pt)
 	}
