@@ -240,25 +240,25 @@ func findPokinById(idPokin int) (PohonKinerjaPemda, error) {
 }
 
 func getIndikators(idPokin int) ([]IndikatorPohon, error) {
-	indTematikRows, err := db.Query(`SELECT id, indikator FROM tb_indikator WHERE pokin_id = ?`, idPokin)
+	indTematikRows, err := db.Query(`SELECT id, pokin_id, indikator FROM tb_indikator WHERE pokin_id = ?`, idPokin)
 	if err != nil {
 		return nil, fmt.Errorf("query error %v", err)
 	}
 	var indPt []IndikatorPohon
 	for indTematikRows.Next() {
 		var ind IndikatorPohon
-		if err := indTematikRows.Scan(&ind.IdIndikator, &ind.Indikator); err != nil {
+		if err := indTematikRows.Scan(&ind.IdIndikator, &ind.IdPokin, &ind.Indikator); err != nil {
 			return nil, fmt.Errorf("query error %v", err)
 		}
 		// targets
-		indTargetRows, err := db.Query(`SELECT id, target, satuan, tahun FROM tb_target WHERE indikator_id = ?`, ind.IdIndikator)
+		indTargetRows, err := db.Query(`SELECT id, indikator_id, target, satuan, tahun FROM tb_target WHERE indikator_id = ?`, ind.IdIndikator)
 		if err != nil {
 			return nil, fmt.Errorf("query error %v", err)
 		}
 		var tarPt []TargetIndikator
 		for indTargetRows.Next() {
 			var tar TargetIndikator
-			if err := indTargetRows.Scan(&tar.IdTarget, &tar.Target, &tar.Satuan, &tar.Tahun); err != nil {
+			if err := indTargetRows.Scan(&tar.IdTarget, &tar.IndikatorId, &tar.Target, &tar.Satuan, &tar.Tahun); err != nil {
 				return nil, fmt.Errorf("query error %v", err)
 			}
 			tarPt = append(tarPt, tar)
@@ -272,7 +272,7 @@ func getIndikators(idPokin int) ([]IndikatorPohon, error) {
 }
 
 func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
-	rows, err := db.Query(`SELECT id, tahun, nama_pohon, kode_opd, jenis_pohon, keterangan, status
+	rows, err := db.Query(`SELECT id, parent, tahun, nama_pohon, kode_opd, jenis_pohon, level_pohon, keterangan, status
 		FROM tb_pohon_kinerja
 		WHERE tahun = 2025 AND parent = ?`, parentId)
 	if err != nil {
@@ -285,8 +285,8 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 
 	for rows.Next() {
 		var pt PohonKinerjaPemda
-		if err := rows.Scan(&pt.IdPohon, &pt.Tahun, &pt.NamaPohon, &pt.KodeOpd,
-			&pt.JenisPohon, &pt.Keterangan, &pt.Status); err != nil {
+		if err := rows.Scan(&pt.IdPohon, &pt.Parent, &pt.Tahun, &pt.NamaPohon, &pt.KodeOpd,
+			&pt.JenisPohon, &pt.LevelPohon, &pt.Keterangan, &pt.Status); err != nil {
 			return nil, 0, err
 		}
 
@@ -306,12 +306,18 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 			pt.RencanaKinerjas = sourcePokin.RencanaKinerjas
 
 			var kegiatans []Kegiatan
+			seen := make(map[string]bool)
+
 			for _, rekin := range pt.RencanaKinerjas {
 				kegiatanPokin, err := getKegiatanFromSubkegiatan(rekin.KodeSubkegiatan)
 				if err != nil {
 					return nil, 0, fmt.Errorf("Kegiatan tidak ditemukan")
 				}
-				kegiatans = append(kegiatans, kegiatanPokin)
+
+				if !seen[kegiatanPokin.KodeKegiatan] {
+					seen[kegiatanPokin.KodeKegiatan] = true
+					kegiatans = append(kegiatans, kegiatanPokin)
+				}
 			}
 			pt.KegiatanPokin = kegiatans
 		}
@@ -325,6 +331,8 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 
 		if pt.JenisPohon == "Tactical Pemda" && pt.Status == "disetujui" {
 			var programs []Program
+			seen := make(map[string]bool)
+
 			for _, child := range pt.Childs {
 				var kegiatans = child.KegiatanPokin
 				for _, kegiatan := range kegiatans {
@@ -332,7 +340,11 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 					if err != nil {
 						return nil, 0, fmt.Errorf("Program tidak ditemukan")
 					}
-					programs = append(programs, programPokin)
+
+					if !seen[programPokin.KodeProgram] {
+						seen[programPokin.KodeProgram] = true
+						programs = append(programs, programPokin)
+					}
 				}
 			}
 			pt.ProgramPokin = programs
@@ -340,6 +352,8 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 
 		if pt.JenisPohon == "Strategic Pemda" && pt.Status == "disetujui" {
 			var bidangUrusans []BidangUrusan
+			seen := make(map[string]bool)
+
 			for _, child := range pt.Childs {
 				var programs = child.ProgramPokin
 				for _, program := range programs {
@@ -347,7 +361,10 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 					if err != nil {
 						return nil, 0, fmt.Errorf("Bidang Urusan tidak ditermukan")
 					}
-					bidangUrusans = append(bidangUrusans, bidangUrusanPokin)
+					if !seen[bidangUrusanPokin.KodeBidangUrusan] {
+						seen[bidangUrusanPokin.KodeBidangUrusan] = true
+						bidangUrusans = append(bidangUrusans, bidangUrusanPokin)
+					}
 				}
 			}
 			pt.BidangUrusanPokin = bidangUrusans
@@ -404,7 +421,7 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// query pohon tematik
-	rows, err := db.Query(`SELECT id, tahun, nama_pohon, kode_opd, jenis_pohon, keterangan,  status
+	rows, err := db.Query(`SELECT id, tahun, nama_pohon, kode_opd, jenis_pohon, level_pohon, keterangan,  status
                            FROM tb_pohon_kinerja
                            WHERE level_pohon = 0 AND parent = 0 AND jenis_pohon = 'Tematik' AND id = ? LIMIT 1`, tematikId)
 	if err != nil {
@@ -416,7 +433,7 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 	var list []PohonKinerjaPemda
 	for rows.Next() {
 		var pt PohonKinerjaPemda
-		if err := rows.Scan(&pt.IdPohon, &pt.Tahun, &pt.NamaPohon, &pt.KodeOpd, &pt.JenisPohon, &pt.Keterangan, &pt.Status); err != nil {
+		if err := rows.Scan(&pt.IdPohon, &pt.Tahun, &pt.NamaPohon, &pt.KodeOpd, &pt.JenisPohon, &pt.LevelPohon, &pt.Keterangan, &pt.Status); err != nil {
 			http.Error(w, "scan error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -440,6 +457,8 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 
 		// get urusan for tematik
 		var urusans []Urusan
+		seen := make(map[string]bool)
+
 		for _, child := range pt.Childs {
 			var bidangUrusans = child.BidangUrusanPokin
 			for _, bidangUrusan := range bidangUrusans {
@@ -448,7 +467,10 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				urusans = append(urusans, urusanPokin)
+				if !seen[urusanPokin.KodeUrusan] {
+					seen[urusanPokin.KodeUrusan] = true
+					urusans = append(urusans, urusanPokin)
+				}
 			}
 		}
 		pt.UrusanPokin = urusans

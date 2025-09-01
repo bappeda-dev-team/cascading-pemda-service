@@ -13,9 +13,11 @@ type CascadingPemda struct {
 
 type PohonKinerjaPemda struct {
 	IdPohon           int                 `json:"id_pohon"`
+	Parent            int                 `json:"parent"`
 	Tahun             Tahun               `json:"tahun"`
 	NamaPohon         string              `json:"nama_pohon"`
 	KodeOpd           string              `json:"kode_opd,omitempty"`
+	LevelPohon        int                 `json:"level_pohon"`
 	JenisPohon        JenisPohon          `json:"jenis_pohon"`
 	Keterangan        Keterangan          `json:"keterangan"`
 	UrusanPokin       []Urusan            `json:"urusan_pokin,omitempty"`
@@ -23,7 +25,7 @@ type PohonKinerjaPemda struct {
 	ProgramPokin      []Program           `json:"program_pokin,omitempty"`
 	KegiatanPokin     []Kegiatan          `json:"kegiatan_pokin,omitempty"`
 	Pagu              Pagu                `json:"pagu"`
-	Indikators        []IndikatorPohon    `json:"indikators,omitempty"`
+	Indikators        []IndikatorPohon    `json:"indikator,omitempty"`
 	Childs            []PohonKinerjaPemda `json:"childs,omitempty"`
 	RencanaKinerjas   []RencanaKinerjaAsn `json:"rencana_kinerjas,omitempty"`
 
@@ -67,13 +69,15 @@ type RencanaKinerjaAsn struct {
 
 type IndikatorPohon struct {
 	IdIndikator string            `json:"id_indikator"`
-	Indikator   string            `json:"indikator"`
-	Target      []TargetIndikator `json:"target"`
+	IdPokin     string            `json:"id_pokin"`
+	Indikator   string            `json:"nama_indikator"`
+	Target      []TargetIndikator `json:"targets"`
 }
 
 type TargetIndikator struct {
-	IdTarget string `json:"id_target"`
-	Target   string `json:"target"`
-	Satuan   string `json:"satuan"`
-	Tahun    Tahun  `json:"tahun"`
+	IdTarget    string `json:"id_target"`
+	IndikatorId string `json:"indikator_id"`
+	Target      string `json:"target"`
+	Satuan      string `json:"satuan"`
+	Tahun       Tahun  `json:"tahun"`
 }
