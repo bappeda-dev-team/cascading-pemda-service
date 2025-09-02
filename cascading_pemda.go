@@ -28,7 +28,7 @@ type PohonKinerjaPemda struct {
 	KegiatanPokin     []Kegiatan          `json:"kegiatan_pokin,omitempty"`
 	Pagu              Pagu                `json:"pagu"`
 	Tagging           []TaggingPokin      `json:"tagging"`
-	RencanaKinerjas   []RencanaKinerjaAsn `json:"pelaksana,omitempty"`
+	RencanaKinerjas   []RencanaKinerjaAsn `json:"rencana_kinerja,omitempty"`
 
 	Indikators []IndikatorPohon    `json:"indikator,omitempty"`
 	Childs     []PohonKinerjaPemda `json:"childs,omitempty"`
@@ -61,10 +61,10 @@ type Subkegiatan struct {
 }
 
 type RencanaKinerjaAsn struct {
-	IdRekin         string `json:"id_rekin"`
-	RencanaKinerja  string `json:"rencana_kinerja"`
-	NamaPelaksana   string `json:"nama_pelaksana"`
-	NIPPelaksana    string `json:"nip_pelaksana"`
+	IdRekin         string `json:"id_rencana_kinerja"`
+	RencanaKinerja  string `json:"nama_rencana_kinerja"`
+	NamaPelaksana   string `json:"nama_pegawai"`
+	NIPPelaksana    string `json:"pegawai_id"`
 	KodeSubkegiatan string `json:"kode_subkegiatan"`
 	NamaSubkegiatan string `json:"nama_subkegiatan"`
 	Pagu            Pagu   `json:"pagu"`
