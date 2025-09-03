@@ -29,10 +29,11 @@ func initDB() {
 	}
 
 	log.Printf("koneksi ke database berhasil")
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(100)
+	db.SetMaxOpenConns(90)
+	db.SetMaxIdleConns(45)
 	db.SetConnMaxIdleTime(5 * time.Minute)
 	db.SetConnMaxLifetime(60 * time.Minute)
+
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
