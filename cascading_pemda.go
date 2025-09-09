@@ -21,8 +21,8 @@ type PohonKinerjaPemda struct {
 	Keterangan        Keterangan          `json:"keterangan"`
 	TujuanPemda       []TujuanPemda       `json:"tujuan_pemda,omitempty"`
 	SasaranPemda      []SasaranPemda      `json:"sasaran_pemda,omitempty"`
-	UrusanPokin       []Urusan            `json:"urusan_pokin,omitempty"`
-	BidangUrusanPokin []BidangUrusan      `json:"bidang_urusan_pokin,omitempty"`
+	UrusanPokin       []Urusan            `json:"urusan,omitempty"`
+	BidangUrusanPokin []BidangUrusan      `json:"bidang_urusan,omitempty"`
 	ProgramPokin      []Program           `json:"program,omitempty"`
 	Pagu              Pagu                `json:"pagu"`
 	Tagging           []TaggingPokin      `json:"tagging"`
