@@ -2,7 +2,6 @@ package main
 
 type JenisPohon string
 type Keterangan string
-type Tahun int
 type Pagu int
 
 type CascadingPemda struct {
@@ -14,7 +13,7 @@ type CascadingPemda struct {
 type PohonKinerjaPemda struct {
 	IdPohon           int                 `json:"id_pohon"`
 	Parent            int                 `json:"parent"`
-	Tahun             Tahun               `json:"tahun"`
+	Tahun             int                 `json:"tahun"`
 	NamaPohon         string              `json:"nama_pohon"`
 	KodeOpd           string              `json:"kode_opd,omitempty"`
 	LevelPohon        int                 `json:"level_pohon"`
@@ -45,8 +44,9 @@ type BidangUrusan struct {
 }
 
 type Program struct {
-	KodeProgram string `json:"kode_program"`
-	NamaProgram string `json:"nama_program"`
+	KodeProgram      string           `json:"kode_program"`
+	NamaProgram      string           `json:"nama_program"`
+	IndikatorProgram []IndikatorPohon `json:"indikator"`
 }
 
 type Kegiatan struct {
@@ -60,21 +60,24 @@ type Subkegiatan struct {
 }
 
 type RencanaKinerjaAsn struct {
-	IdRekin         string   `json:"id_rencana_kinerja"`
-	RencanaKinerja  string   `json:"nama_rencana_kinerja"`
-	NamaPelaksana   string   `json:"nama_pegawai"`
-	NIPPelaksana    string   `json:"pegawai_id"`
-	KodeKegiatan string `json:"kode_kegiatan"`
-	NamaKegiatan string `json:"nama_kegiatan"`
-	KodeSubkegiatan string   `json:"kode_subkegiatan"`
-	NamaSubkegiatan string   `json:"nama_subkegiatan"`
-	Pagu            Pagu     `json:"pagu"`
+	IdRekin              string           `json:"id_rencana_kinerja"`
+	RencanaKinerja       string           `json:"nama_rencana_kinerja"`
+	NamaPelaksana        string           `json:"nama_pegawai"`
+	NIPPelaksana         string           `json:"pegawai_id"`
+	KodeKegiatan         string           `json:"kode_kegiatan"`
+	NamaKegiatan         string           `json:"nama_kegiatan"`
+	IndikatorKegiatan    []IndikatorPohon `json:"indikator_kegiatan"`
+	KodeSubkegiatan      string           `json:"kode_subkegiatan"`
+	NamaSubkegiatan      string           `json:"nama_subkegiatan"`
+	IndikatorSubkegiatan []IndikatorPohon `json:"indikator_subkegiatan"`
+	Pagu                 Pagu             `json:"pagu"`
 }
 
 type IndikatorPohon struct {
 	IdIndikator string            `json:"id_indikator"`
-	IdPokin     string            `json:"id_pokin"`
+	IdPokin     string            `json:"id_pokin,omitempty"`
 	Indikator   string            `json:"nama_indikator"`
+	Kode        string            `json:"kode"`
 	Target      []TargetIndikator `json:"targets"`
 }
 
@@ -83,7 +86,7 @@ type TargetIndikator struct {
 	IndikatorId string `json:"indikator_id"`
 	Target      string `json:"target"`
 	Satuan      string `json:"satuan"`
-	Tahun       Tahun  `json:"tahun"`
+	Tahun       int    `json:"tahun,omitempty"`
 }
 
 type TaggingPokin struct {

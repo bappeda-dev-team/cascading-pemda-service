@@ -211,7 +211,7 @@ func getKegiatanFromSubkegiatan(kodeSubkegiatan string) (Kegiatan, error) {
 	return keg, nil
 }
 
-func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
+func getRencanaKinerjaPokin(idPokin int, tahun int) ([]RencanaKinerjaAsn, error) {
 	query := `
 		SELECT rekin.id,
 		       rekin.nama_rencana_kinerja,
@@ -287,6 +287,20 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 			rekin.Pagu = Pagu(totalPagu.Int64)
 		}
 
+		// get indikator kegiatan
+		indKegs, err := getIndikatorsPKS(rekin.KodeKegiatan, tahun)
+		if err != nil {
+			return nil, fmt.Errorf("scan ind keg error: %w", err)
+		}
+		rekin.IndikatorKegiatan = indKegs
+
+		// get indikator subkegiatan
+		indSubKegs, err := getIndikatorsPKS(rekin.KodeSubkegiatan, tahun)
+		if err != nil {
+			return nil, fmt.Errorf("scan ind sub error: %w", err)
+		}
+		rekin.IndikatorSubkegiatan = indSubKegs
+
 		rekins = append(rekins, rekin)
 	}
 
@@ -297,13 +311,13 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 	return rekins, nil
 }
 
-func findPokinById(idPokin int) (PohonKinerjaPemda, error) {
+func findPokinById(idPokin int, tahun int) (PohonKinerjaPemda, error) {
 	query := `SELECT id, tahun, nama_pohon, kode_opd, jenis_pohon, keterangan, status
 			  FROM tb_pohon_kinerja
 			  WHERE tahun = ? AND clone_from = ? LIMIT 1`
 
 	var pokin PohonKinerjaPemda
-	err := db.QueryRow(query, 2025, idPokin).Scan(
+	err := db.QueryRow(query, tahun, idPokin).Scan(
 		&pokin.IdPohon,
 		&pokin.Tahun,
 		&pokin.NamaPohon,
@@ -319,7 +333,7 @@ func findPokinById(idPokin int) (PohonKinerjaPemda, error) {
 		return PohonKinerjaPemda{}, fmt.Errorf("query error: %w", err)
 	}
 
-	sasarans, err := getRencanaKinerjaPokin(pokin.IdPohon)
+	sasarans, err := getRencanaKinerjaPokin(pokin.IdPohon, tahun)
 	if err != nil {
 		log.Printf("[ERROR] Get Rekin Pokin %d error: %v", idPokin, err)
 		return pokin, fmt.Errorf("getRencanaKinerjaPokin(%d): %w", pokin.IdPohon, err)
@@ -330,8 +344,86 @@ func findPokinById(idPokin int) (PohonKinerjaPemda, error) {
 	return pokin, nil
 }
 
-func getIndikators(idPokin int) ([]IndikatorPohon, error) {
-	indTematikRows, err := db.Query(`SELECT id, pokin_id, indikator FROM tb_indikator WHERE pokin_id = ?`, idPokin)
+func getIndikatorsPKS(kode string, tahun int) ([]IndikatorPohon, error) {
+	// TODO dyanimckan tahun
+	rows, err := db.Query(`SELECT id, indikator, kode FROM tb_indikator WHERE tahun = ? AND kode = ? `, tahun, kode)
+	if err != nil {
+		return nil, fmt.Errorf("query indikator error: %w", err)
+	}
+	defer rows.Close()
+
+	var indPt []IndikatorPohon
+
+	for rows.Next() {
+		var ind IndikatorPohon
+		if err := rows.Scan(&ind.IdIndikator, &ind.Indikator, &ind.Kode); err != nil {
+			return nil, fmt.Errorf("scan indikator error: %w", err)
+		}
+
+		// ambil target
+		// TODO dyanimckan tahun
+		targetRows, err := db.Query(`
+			SELECT id, indikator_id, target, satuan, tahun
+			FROM tb_target
+			WHERE indikator_id = ?`, ind.IdIndikator)
+		if err != nil {
+			return nil, fmt.Errorf("query target error: %w", err)
+		}
+		defer targetRows.Close()
+
+		var tarPt []TargetIndikator
+		for targetRows.Next() {
+			var tar TargetIndikator
+
+			var target sql.NullString
+			var satuan sql.NullString
+			var tahun sql.NullInt64
+
+			if err := targetRows.Scan(
+				&tar.IdTarget,
+				&tar.IndikatorId,
+				&target,
+				&satuan,
+				&tahun,
+			); err != nil {
+				return nil, fmt.Errorf("scan target error: %w", err)
+			}
+
+			// handle NULL → set default kosong / nol
+			if target.Valid {
+				tar.Target = target.String
+			} else {
+				tar.Target = ""
+			}
+
+			if satuan.Valid {
+				tar.Satuan = satuan.String
+			} else {
+				tar.Satuan = ""
+			}
+
+			if tahun.Valid {
+				tar.Tahun = int(tahun.Int64)
+			} else {
+				tar.Tahun = 0
+			}
+
+			tarPt = append(tarPt, tar)
+		}
+
+		ind.Target = tarPt
+		indPt = append(indPt, ind)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return indPt, nil
+}
+
+func getIndikators(idPokin int, tahun int) ([]IndikatorPohon, error) {
+	indTematikRows, err := db.Query(`SELECT id, pokin_id, indikator FROM tb_indikator WHERE tahun = ? AND pokin_id = ?`,tahun, idPokin)
 	if err != nil {
 		return nil, fmt.Errorf("query error %v", err)
 	}
@@ -362,10 +454,10 @@ func getIndikators(idPokin int) ([]IndikatorPohon, error) {
 	return indPt, nil
 }
 
-func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
+func getChildPokins(parentId int, tahun int) ([]PohonKinerjaPemda, Pagu, error) {
 	rows, err := db.Query(`SELECT id, parent, tahun, nama_pohon, kode_opd, jenis_pohon, level_pohon, keterangan, status
 		FROM tb_pohon_kinerja
-		WHERE parent = ?`, parentId)
+		WHERE tahun = ? AND parent = ?`, tahun, parentId)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -382,7 +474,7 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 		}
 
 		// ambil indikator
-		indCt, err := getIndikators(pt.IdPohon)
+		indCt, err := getIndikators(pt.IdPohon, tahun)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -390,7 +482,7 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 
 		// operational pemda → ambil rencana kinerja langsung pakai IdPohon
 		if pt.Status == "disetujui" {
-			sourcePokin, err := findPokinById(pt.IdPohon)
+			sourcePokin, err := findPokinById(pt.IdPohon, tahun)
 			if err != nil {
 				return nil, 0, fmt.Errorf("findPokinById(%d): %w", pt.IdPohon, err)
 			}
@@ -398,7 +490,7 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 		}
 
 		// rekursif ambil anaknya
-		childTematiks, childPagu, err := getChildPokins(pt.IdPohon)
+		childTematiks, childPagu, err := getChildPokins(pt.IdPohon, tahun)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -424,6 +516,14 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 
 					if _, ok := seen[programPokin.KodeProgram]; !ok {
 						seen[programPokin.KodeProgram] = struct{}{}
+
+						// get indikator program
+						indList, err := getIndikatorsPKS(programPokin.KodeProgram, tahun)
+						if err != nil {
+							return nil, 0, fmt.Errorf("Indikator program error")
+						}
+
+						programPokin.IndikatorProgram = indList
 						programs = append(programs, programPokin)
 					}
 				}
@@ -510,16 +610,28 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tahunStr := r.URL.Query().Get("tahun")
+	if tahunStr == "" {
+		http.Error(w, "params tahun is required, misal: ?tematikId=123&tahun=2025", http.StatusBadRequest)
+		return
+	}
+
 	tematikId, err := strconv.Atoi(tematikIdStr)
 	if err != nil {
 		http.Error(w, "invalid tematikId", http.StatusBadRequest)
 		return
 	}
 
+	tahun, err := strconv.Atoi(tahunStr)
+	if err != nil {
+		http.Error(w, "invalid tahun", http.StatusBadRequest)
+		return
+	}
+
 	// query pohon tematik
 	rows, err := db.Query(`SELECT id, tahun, nama_pohon, kode_opd, jenis_pohon, level_pohon, keterangan,  status
                            FROM tb_pohon_kinerja
-                           WHERE level_pohon = 0 AND parent = 0 AND jenis_pohon = 'Tematik' AND id = ? LIMIT 1`, tematikId)
+                           WHERE level_pohon = 0 AND parent = 0 AND tahun = ? AND jenis_pohon = 'Tematik' AND id = ? LIMIT 1`, tahun, tematikId)
 	if err != nil {
 		http.Error(w, "query error: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -534,14 +646,14 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		indList, err := getIndikators(pt.IdPohon)
+		indList, err := getIndikators(pt.IdPohon, tahun)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		pt.Indikators = indList
 
-		childs, pagu, err := getChildPokins(pt.IdPohon)
+		childs, pagu, err := getChildPokins(pt.IdPohon, tahun)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -589,9 +701,11 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 		list = append(list, pt)
 	}
 
+	msg := fmt.Sprintf("Laporan Cascading Pemda Tahun %d", tahun)
+
 	response := CascadingPemda{
 		Status:  http.StatusOK,
-		Message: "Laporan Cascading Pemda Tahun 2025",
+		Message: msg,
 		Tematik: list}
 
 	w.Header().Set("Content-Type", "application/json")
