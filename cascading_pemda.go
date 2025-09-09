@@ -24,8 +24,8 @@ type PohonKinerjaPemda struct {
 	SasaranPemda      []SasaranPemda      `json:"sasaran_pemda,omitempty"`
 	UrusanPokin       []Urusan            `json:"urusan_pokin,omitempty"`
 	BidangUrusanPokin []BidangUrusan      `json:"bidang_urusan_pokin,omitempty"`
-	ProgramPokin      []Program           `json:"program_pokin,omitempty"`
-	KegiatanPokin     []Kegiatan          `json:"kegiatan_pokin,omitempty"`
+	ProgramPokin      []Program           `json:"program,omitempty"`
+	KegiatanPokin     []Kegiatan          `json:"kegiatan,omitempty"`
 	Pagu              Pagu                `json:"pagu"`
 	Tagging           []TaggingPokin      `json:"tagging"`
 	RencanaKinerjas   []RencanaKinerjaAsn `json:"rencana_kinerja,omitempty"`
