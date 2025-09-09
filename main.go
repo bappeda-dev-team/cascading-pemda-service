@@ -34,7 +34,6 @@ func initDB() {
 	db.SetConnMaxIdleTime(5 * time.Minute)
 	db.SetConnMaxLifetime(60 * time.Minute)
 
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -222,16 +221,26 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
                keg.nama_kegiatan,
 		       subkegiatan.kode_subkegiatan,
 		       subkegiatan.nama_subkegiatan,
-		       rinbel.anggaran
+		       SUM(rinbel.anggaran) AS total_anggaran
 		FROM tb_rencana_kinerja rekin
 		JOIN tb_pegawai pegawai ON pegawai.nip = rekin.pegawai_id
 		JOIN tb_subkegiatan_terpilih sub_rekin ON sub_rekin.rekin_id = rekin.id
-		LEFT JOIN tb_subkegiatan subkegiatan ON subkegiatan.kode_subkegiatan = sub_rekin.kode_subkegiatan
-        LEFT JOIN tb_master_kegiatan keg ON keg.kode_kegiatan = SUBSTRING(sub_rekin.kode_subkegiatan, 1, 12)
-		JOIN tb_rencana_aksi renaksi ON renaksi.rencana_kinerja_id = rekin.id
-		JOIN tb_rincian_belanja rinbel ON rinbel.renaksi_id = renaksi.id
-		JOIN tb_pohon_kinerja pokin ON rekin.id_pohon = pokin.id
-		WHERE pokin.id = ?`
+		LEFT JOIN tb_subkegiatan subkegiatan
+		       ON subkegiatan.kode_subkegiatan = sub_rekin.kode_subkegiatan
+        LEFT JOIN tb_master_kegiatan keg
+		       ON keg.kode_kegiatan = SUBSTRING(sub_rekin.kode_subkegiatan, 1, 12)
+		JOIN tb_rencana_aksi renaksi
+		       ON renaksi.rencana_kinerja_id = rekin.id
+		JOIN tb_rincian_belanja rinbel
+		       ON rinbel.renaksi_id = renaksi.id
+		JOIN tb_pohon_kinerja pokin
+		       ON rekin.id_pohon = pokin.id
+		WHERE pokin.id = ?
+		GROUP BY rekin.id, rekin.nama_rencana_kinerja,
+		         pegawai.nama, pegawai.nip,
+		         keg.kode_kegiatan, keg.nama_kegiatan,
+		         subkegiatan.kode_subkegiatan, subkegiatan.nama_subkegiatan
+	`
 
 	rows, err := db.Query(query, idPokin)
 	if err != nil {
@@ -245,7 +254,7 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 		var rekin RencanaKinerjaAsn
 		var kodeKeg, namaKeg sql.NullString
 		var kodeSub, namaSub sql.NullString
-		var pagu sql.NullInt64
+		var totalPagu sql.NullInt64
 
 		if err := rows.Scan(
 			&rekin.IdRekin,
@@ -256,21 +265,26 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 			&namaKeg,
 			&kodeSub,
 			&namaSub,
-			&pagu,
+			&totalPagu,
 		); err != nil {
 			log.Printf("[ERROR] scan rekin error: %v", err)
 			return nil, fmt.Errorf("scan error: %w", err)
 		}
 
-		// Handle NULL dengan NullString/NullInt64
+		if kodeKeg.Valid {
+			rekin.KodeKegiatan = kodeKeg.String
+		}
+		if namaKeg.Valid {
+			rekin.NamaKegiatan = namaKeg.String
+		}
 		if kodeSub.Valid {
 			rekin.KodeSubkegiatan = kodeSub.String
 		}
 		if namaSub.Valid {
 			rekin.NamaSubkegiatan = namaSub.String
 		}
-		if pagu.Valid {
-			rekin.Pagu = Pagu(pagu.Int64)
+		if totalPagu.Valid {
+			rekin.Pagu = Pagu(totalPagu.Int64)
 		}
 
 		rekins = append(rekins, rekin)
@@ -351,7 +365,7 @@ func getIndikators(idPokin int) ([]IndikatorPohon, error) {
 func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 	rows, err := db.Query(`SELECT id, parent, tahun, nama_pohon, kode_opd, jenis_pohon, level_pohon, keterangan, status
 		FROM tb_pohon_kinerja
-		WHERE tahun = 2025 AND parent = ?`, parentId)
+		WHERE parent = ?`, parentId)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -392,22 +406,29 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 
 		if pt.JenisPohon == "Tactical Pemda" && pt.Status == "disetujui" {
 			var programs []Program
-			seen := make(map[string]bool)
+			seen := make(map[string]struct{})
 
 			for _, child := range pt.Childs {
-				var kegiatans = child.RencanaKinerjas
-				for _, kegiatan := range kegiatans {
-					programPokin, err := getProgramFromKegiatan(kegiatan.KodeKegiatan)
-					if err != nil {
-						return nil, 0, fmt.Errorf("Program tidak ditemukan")
+				for _, kegiatan := range child.RencanaKinerjas {
+					if kegiatan.KodeKegiatan == "" {
+						// skip kalau kode kosong
+						continue
 					}
 
-					if !seen[programPokin.KodeProgram] {
-						seen[programPokin.KodeProgram] = true
+					programPokin, err := getProgramFromKegiatan(kegiatan.KodeKegiatan)
+					if err != nil {
+						// bisa log atau teruskan, sesuai kebutuhan
+						// log.Printf("Program tidak ditemukan untuk kode %s: %v", kegiatan.KodeKegiatan, err)
+						continue
+					}
+
+					if _, ok := seen[programPokin.KodeProgram]; !ok {
+						seen[programPokin.KodeProgram] = struct{}{}
 						programs = append(programs, programPokin)
 					}
 				}
 			}
+
 			pt.ProgramPokin = programs
 		}
 
