@@ -218,6 +218,8 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 		       rekin.nama_rencana_kinerja,
 		       pegawai.nama,
 		       pegawai.nip,
+               keg.kode_kegiatan,
+               keg.nama_kegiatan,
 		       subkegiatan.kode_subkegiatan,
 		       subkegiatan.nama_subkegiatan,
 		       rinbel.anggaran
@@ -225,6 +227,7 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 		JOIN tb_pegawai pegawai ON pegawai.nip = rekin.pegawai_id
 		JOIN tb_subkegiatan_terpilih sub_rekin ON sub_rekin.rekin_id = rekin.id
 		LEFT JOIN tb_subkegiatan subkegiatan ON subkegiatan.kode_subkegiatan = sub_rekin.kode_subkegiatan
+        LEFT JOIN tb_master_kegiatan keg ON keg.kode_kegiatan = SUBSTRING(sub_rekin.kode_subkegiatan, 1, 12)
 		JOIN tb_rencana_aksi renaksi ON renaksi.rencana_kinerja_id = rekin.id
 		JOIN tb_rincian_belanja rinbel ON rinbel.renaksi_id = renaksi.id
 		JOIN tb_pohon_kinerja pokin ON rekin.id_pohon = pokin.id
@@ -240,6 +243,7 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 
 	for rows.Next() {
 		var rekin RencanaKinerjaAsn
+		var kodeKeg, namaKeg sql.NullString
 		var kodeSub, namaSub sql.NullString
 		var pagu sql.NullInt64
 
@@ -248,6 +252,8 @@ func getRencanaKinerjaPokin(idPokin int) ([]RencanaKinerjaAsn, error) {
 			&rekin.RencanaKinerja,
 			&rekin.NamaPelaksana,
 			&rekin.NIPPelaksana,
+			&kodeKeg,
+			&namaKeg,
 			&kodeSub,
 			&namaSub,
 			&pagu,
@@ -375,22 +381,6 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 				return nil, 0, fmt.Errorf("findPokinById(%d): %w", pt.IdPohon, err)
 			}
 			pt.RencanaKinerjas = sourcePokin.RencanaKinerjas
-
-			var kegiatans []Kegiatan
-			seen := make(map[string]bool)
-
-			for _, rekin := range pt.RencanaKinerjas {
-				kegiatanPokin, err := getKegiatanFromSubkegiatan(rekin.KodeSubkegiatan)
-				if err != nil {
-					return nil, 0, fmt.Errorf("Kegiatan tidak ditemukan")
-				}
-
-				if !seen[kegiatanPokin.KodeKegiatan] {
-					seen[kegiatanPokin.KodeKegiatan] = true
-					kegiatans = append(kegiatans, kegiatanPokin)
-				}
-			}
-			pt.KegiatanPokin = kegiatans
 		}
 
 		// rekursif ambil anaknya
@@ -405,7 +395,7 @@ func getChildPokins(parentId int) ([]PohonKinerjaPemda, Pagu, error) {
 			seen := make(map[string]bool)
 
 			for _, child := range pt.Childs {
-				var kegiatans = child.KegiatanPokin
+				var kegiatans = child.RencanaKinerjas
 				for _, kegiatan := range kegiatans {
 					programPokin, err := getProgramFromKegiatan(kegiatan.KodeKegiatan)
 					if err != nil {
