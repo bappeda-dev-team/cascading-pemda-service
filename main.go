@@ -423,7 +423,7 @@ func getIndikatorsPKS(kode string, tahun int) ([]IndikatorPohon, error) {
 }
 
 func getIndikators(idPokin int, tahun int) ([]IndikatorPohon, error) {
-	indTematikRows, err := db.Query(`SELECT id, pokin_id, indikator FROM tb_indikator WHERE tahun = ? AND pokin_id = ?`,tahun, idPokin)
+	indTematikRows, err := db.Query(`SELECT id, pokin_id, indikator FROM tb_indikator WHERE tahun = ? AND pokin_id = ?`, tahun, idPokin)
 	if err != nil {
 		return nil, fmt.Errorf("query error %v", err)
 	}
@@ -554,10 +554,17 @@ func getChildPokins(parentId int, tahun int) ([]PohonKinerjaPemda, Pagu, error) 
 
 		if pt.JenisPohon == "Sub Tematik" {
 			var bidangUrusans []BidangUrusan
+			seen := make(map[string]bool)
+
 			for _, child := range pt.Childs {
-				bidangUrusanPokin := child.BidangUrusanPokin
-				bidangUrusans = append(bidangUrusans, bidangUrusanPokin...)
+				for _, bidangUrusanPokin := range child.BidangUrusanPokin {
+					if !seen[bidangUrusanPokin.KodeBidangUrusan] {
+						seen[bidangUrusanPokin.KodeBidangUrusan] = true
+						bidangUrusans = append(bidangUrusans, bidangUrusanPokin)
+					}
+				}
 			}
+
 			pt.BidangUrusanPokin = bidangUrusans
 		}
 
