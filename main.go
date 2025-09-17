@@ -698,12 +698,21 @@ func cascadingHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		pt.Tagging = tagList
 
+		var uniqTujPemda []TujuanPemda
+		seenTuj := make(map[string]bool)
+
 		tujuanPemdas, err := getTujuanPemda(pt.IdPohon)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		pt.TujuanPemda = tujuanPemdas
+		for _, tuj := range tujuanPemdas {
+			if !seenTuj[tuj.TujuanPemda] {
+				seenTuj[tuj.TujuanPemda] = true
+				uniqTujPemda = append(uniqTujPemda, tuj)
+			}
+		}
+		pt.TujuanPemda = uniqTujPemda
 
 		list = append(list, pt)
 	}
