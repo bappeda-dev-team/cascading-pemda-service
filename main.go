@@ -120,8 +120,12 @@ func getTaggingPokin(idPokin int) ([]TaggingPokin, error) {
 	var tags []TaggingPokin
 	for rows.Next() {
 		var tag TaggingPokin
-		if err := rows.Scan(&tag.Id, &tag.IdPokin, &tag.NamaTagging, &tag.KeteranganTagging, &tag.CloneFrom); err != nil {
+		var ketTaggingNS sql.NullString
+		if err := rows.Scan(&tag.Id, &tag.IdPokin, &tag.NamaTagging, &ketTaggingNS, &tag.CloneFrom); err != nil {
 			return nil, err
+		}
+		if ketTaggingNS.Valid {
+			tag.KeteranganTagging = ketTaggingNS.String
 		}
 
 		tags = append(tags, tag)
