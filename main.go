@@ -744,9 +744,9 @@ func main() {
 
 	handler := corsMiddleware(http.DefaultServeMux)
 
-	log.Println("Server running di :8081")
+	log.Println("Server running di :8080")
 
-	http.ListenAndServe(":8081", handler)
+	http.ListenAndServe(":8080", handler)
 }
 
 // Middleware CORS
