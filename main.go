@@ -318,7 +318,7 @@ func getRencanaKinerjaPokin(idPokin int, tahun int) ([]RencanaKinerjaAsn, error)
 func findPokinById(idPokin int, tahun int) (PohonKinerjaPemda, error) {
 	query := `SELECT id, tahun, nama_pohon, kode_opd, jenis_pohon, keterangan, status
 			  FROM tb_pohon_kinerja
-			  WHERE tahun = ? AND clone_from = ? LIMIT 1`
+			  WHERE tahun = ? AND clone_from = ?`
 
 	var pokin PohonKinerjaPemda
 	err := db.QueryRow(query, tahun, idPokin).Scan(
@@ -459,7 +459,7 @@ func getIndikators(idPokin int, tahun int) ([]IndikatorPohon, error) {
 }
 
 func getChildPokins(parentId int, tahun int) ([]PohonKinerjaPemda, Pagu, error) {
-	rows, err := db.Query(`SELECT id, parent, tahun, nama_pohon, kode_opd, jenis_pohon, level_pohon, keterangan, status
+	rows, err := db.Query(`SELECT id, parent, tahun, nama_pohon, kode_opd, jenis_pohon, level_pohon, keterangan, status, clone_from
 		FROM tb_pohon_kinerja
 		WHERE tahun = ? AND parent = ?`, tahun, parentId)
 	if err != nil {
@@ -473,7 +473,7 @@ func getChildPokins(parentId int, tahun int) ([]PohonKinerjaPemda, Pagu, error) 
 	for rows.Next() {
 		var pt PohonKinerjaPemda
 		if err := rows.Scan(&pt.IdPohon, &pt.Parent, &pt.Tahun, &pt.NamaPohon, &pt.KodeOpd,
-			&pt.JenisPohon, &pt.LevelPohon, &pt.Keterangan, &pt.Status); err != nil {
+			&pt.JenisPohon, &pt.LevelPohon, &pt.Keterangan, &pt.Status, &pt.CloneFrom); err != nil {
 			return nil, 0, err
 		}
 
@@ -485,8 +485,11 @@ func getChildPokins(parentId int, tahun int) ([]PohonKinerjaPemda, Pagu, error) 
 		pt.Indikators = indCt
 
 		// operational pemda → ambil rencana kinerja langsung pakai IdPohon
-		if pt.Status == "disetujui" {
-			sourcePokin, err := findPokinById(pt.IdPohon, tahun)
+		if pt.Status == "disetujui" || pt.Status == "pokin dari pemda" || pt.Status == "tarik pokin opd" {
+			if pt.CloneFrom == 0 {
+				continue
+			}
+			sourcePokin, err := findPokinById(pt.CloneFrom, tahun)
 			if err != nil {
 				return nil, 0, fmt.Errorf("findPokinById(%d): %w", pt.IdPohon, err)
 			}
@@ -500,7 +503,7 @@ func getChildPokins(parentId int, tahun int) ([]PohonKinerjaPemda, Pagu, error) 
 		}
 		pt.Childs = childTematiks
 
-		if pt.JenisPohon == "Tactical Pemda" && pt.Status == "disetujui" {
+		if (pt.JenisPohon == "Tactical Pemda" && pt.Status == "disetujui") || pt.Status == "tarik pokin opd" {
 			var programs []Program
 			seen := make(map[string]struct{})
 
@@ -536,7 +539,7 @@ func getChildPokins(parentId int, tahun int) ([]PohonKinerjaPemda, Pagu, error) 
 			pt.ProgramPokin = programs
 		}
 
-		if pt.JenisPohon == "Strategic Pemda" && pt.Status == "disetujui" {
+		if (pt.JenisPohon == "Strategic Pemda" && pt.Status == "disetujui") || pt.Status == "tarik pokin opd" {
 			var bidangUrusans []BidangUrusan
 			seen := make(map[string]bool)
 
@@ -741,9 +744,9 @@ func main() {
 
 	handler := corsMiddleware(http.DefaultServeMux)
 
-	log.Println("Server running di :8080")
+	log.Println("Server running di :8081")
 
-	http.ListenAndServe(":8080", handler)
+	http.ListenAndServe(":8081", handler)
 }
 
 // Middleware CORS

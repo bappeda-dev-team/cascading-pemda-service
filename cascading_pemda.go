@@ -31,6 +31,7 @@ type PohonKinerjaPemda struct {
 	Indikators []IndikatorPohon    `json:"indikator,omitempty"`
 	Childs     []PohonKinerjaPemda `json:"childs,omitempty"`
 	Status     string              `json:"-"`
+	CloneFrom  int                 `json:"-"`
 }
 
 type Urusan struct {
